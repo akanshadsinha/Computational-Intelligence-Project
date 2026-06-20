@@ -1,0 +1,28 @@
+{
+  "params": {
+    "islands": 3,
+    "pop": 20,
+    "generations": 10,
+    "mutation": 0.12,
+    "migration": 20,
+    "topology": "ring",
+    "workers": 2,
+    "use_shared_cache": true
+  },
+  "summary": {
+    "best_fitness": 0.018867924528301886,
+    "migrations": 0,
+    "cache_stats": {
+      "hits": 75,
+      "misses": 525,
+      "total": 600,
+      "hit_rate_percent": 12.5,
+      "cache_size": 8368
+    },
+    "mutation_stats": {
+      "initial": 0.11399999999999999,
+      "final": 0.07961045175468748,
+      "avg": 0.09631401291609373
+    }
+  }
+}
