@@ -1,6 +1,8 @@
 """
 visualize.py
+
 Interactive visualization dashboard for the Island Model GA results.
+
 Generates an HTML dashboard with:
   1. Fitness convergence curves per island + global best
   2. Migration event markers on the convergence chart
@@ -15,6 +17,7 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 from typing import List
+
 from island_model import RunResults
 from data_model import COURSES, ROOMS, TIMESLOTS, DAYS, TIMES, get_room, get_slot, get_course, get_professor
 from fitness import Chromosome, penalty_breakdown, evaluate
@@ -54,11 +57,9 @@ def build_dashboard(results: RunResults, output_path: str = "dashboard.html"):
         ),
         cells=dict(
             values=[
-                [
-                    "Room conflicts, professor availability, capacity constraints",
-                    "Island-model GA + adaptive mutation + fitness caching",
-                    f"Best fitness {results.best_fitness:.4f}<br>{len(results.migration_events)} migrations"
-                ]
+                ["Room conflicts, professor availability, capacity constraints"],
+                ["Island-model GA + adaptive mutation + fitness caching"],
+                [f"Best fitness {results.best_fitness:.4f}<br>{len(results.migration_events)} migrations"],
             ],
             fill_color="#0b1227",
             font=dict(color="#e5e8ff", size=12),
@@ -98,13 +99,41 @@ def build_dashboard(results: RunResults, output_path: str = "dashboard.html"):
         col=1,
     )
 
+    # Migration markers.
+    #
+    # NOTE: fig.add_vline(row=2, col=1) is NOT used here on purpose.
+    # Plotly's add_vline()/add_shape() validates against every subplot's
+    # x-axis when row/col are passed, and this figure has Table subplots
+    # (row 1 and row 4 col 2) which have no x-axis at all. That mismatch
+    # raises `PlotlyKeyError: Invalid property specified for object of
+    # type plotly.graph_objs.Table: 'xaxis'` as soon as there is at least
+    # one migration event to draw. Drawing each marker as an explicit
+    # Scatter line (with its own xaxis/yaxis assigned directly) sidesteps
+    # that subplot-scanning logic entirely and renders identically.
     migration_gens = sorted(set(e.generation for e in results.migration_events))
+
+    y_min = min(
+        [min(p) for p in results.all_islands_best_per_gen if p] + [min(results.global_best_per_gen)]
+        if results.global_best_per_gen else [0.0]
+    )
+    y_max = max(
+        [max(p) for p in results.all_islands_best_per_gen if p] + [max(results.global_best_per_gen)]
+        if results.global_best_per_gen else [1.0]
+    )
+    # Small padding so the dashed line visually spans the plot area
+    pad = (y_max - y_min) * 0.05 if y_max > y_min else 0.05
+    y0, y1 = y_min - pad, y_max + pad
+
     for mg in migration_gens:
-        fig.add_vline(
-            x=mg,
-            line_width=1,
-            line_dash="dash",
-            line_color="rgba(255,255,255,0.25)",
+        fig.add_trace(
+            go.Scatter(
+                x=[mg, mg],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(color="rgba(255,255,255,0.25)", width=1, dash="dash"),
+                showlegend=False,
+                hoverinfo="skip",
+            ),
             row=2,
             col=1,
         )
@@ -113,6 +142,7 @@ def build_dashboard(results: RunResults, output_path: str = "dashboard.html"):
     pb = results.penalty_details
     penalty_names = [k.replace("_", " ").title() for k in pb.keys()]
     penalty_values = list(pb.values())
+
     fig.add_trace(
         go.Bar(
             x=penalty_values,
@@ -176,6 +206,7 @@ def build_dashboard(results: RunResults, output_path: str = "dashboard.html"):
     room_usage = {r.name: 0 for r in ROOMS}
     for rid, _ in chrom:
         room_usage[get_room(rid).name] += 1
+
     fig.add_trace(
         go.Bar(
             x=list(room_usage.keys()),
@@ -278,15 +309,16 @@ def print_schedule(results: RunResults):
     entries = []
     for cid, (rid, sid) in enumerate(chrom):
         course = get_course(cid)
-        room   = get_room(rid)
-        slot   = get_slot(sid)
-        prof   = get_professor(course.professor_id)
+        room = get_room(rid)
+        slot = get_slot(sid)
+        prof = get_professor(course.professor_id)
         entries.append((slot.day, slot.start, course.name, room.name, prof.name))
 
     for day, time, name, room, prof in sorted(entries, key=lambda x: (DAYS.index(x[0]), TIMES.index(x[1]))):
         print(f"  {name:<35} {room:<10} {day} {time:<8} {prof}")
 
     print("="*70)
+
     pb = results.penalty_details
     print("\n  Penalty breakdown:")
     for k, v in pb.items():
